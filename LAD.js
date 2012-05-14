@@ -81,7 +81,6 @@ LAD.Class.extend = function(props) {
 	return Class;
 };
 
-
 /*
 	LAD.Math is an object used to enclose useful mathematical methods.
 */
@@ -99,18 +98,15 @@ LAD.Math = {
 	}
 };
 
-
 /*
 	LAD.Game runs all control for the game. It sets the frames and 
 	updates per second (seperately). It allows the game to be started or 
 	stopped and calls update and render upon the active scene.
 */
 LAD.Game = LAD.Class.extend({
-	init: function(canvas, fps) {
-		this.canvas = canvas;
-		this.width = canvas.width;
-		this.height = canvas.height;
-		this.context = canvas.getContext('2d');
+	init: function(canvasName, fps) {
+		var canvas = document.getElementById(canvasName);
+		this.renderer = new LAD.Renderer(canvas);
 		var ups = 30;
 		if (LAD.debug) {
 			fps = 10;
@@ -154,7 +150,8 @@ LAD.Game = LAD.Class.extend({
 	setScene: function(scene) {
 		// unloads the current scene, replaces it with new one
 		if (scene == this.scene) return;
-		if (this.scene) this.stop();
+		this.stop();
+		if (this.scene) this.scene.game = null;
 		this.scene = scene;
 		scene.game = this;
 		this.start();
@@ -177,11 +174,24 @@ LAD.Game = LAD.Class.extend({
 	},
 	callRender: function() {		
 		// clears the canvas, calls scene render then schedules next
-		this.context.clearRect(0, 0, this.width, this.height);
+		this.renderer.clear();
 		this.timeDelta = new Date().getTime() - this.lastUpdate;
-		this.renderPC = this.timeDelta / this.updateTime;
-		this.scene.callRender(this.context);
+		this.renderer.percent = this.timeDelta / this.updateTime;
+		this.scene.callRender(this.renderer);
 		this.timeRender();
+	}
+});
+
+LAD.Renderer = LAD.Class.extend({
+	init: function(canvas) {
+		this.canvas = canvas;
+		this.context = canvas.getContext("2d");
+		this.width = canvas.width;
+		this.height = canvas.height;
+		this.percent = 1;
+	},
+	clear: function() {
+		this.context.clearRect(0, 0, this.width, this.height);
 	}
 });
 
@@ -193,10 +203,11 @@ LAD.List = (function() {
 	function List(){
 		var list = Object.create(Array.prototype);
 		list = (Array.apply(list, arguments) || list);
-		list.add = function(item) {
+		list.add = function(item, index) {
 			// add an item to the list
-			if (this.unique && this.contains(item)) return;
-			return Array.prototype.push.call(this, item);
+			if (isNaN(index)) index = this.length;
+			if (this.contains(item)) this.remove(item);
+			return Array.prototype.splice.call(this, index, 0, item);
 		};
 		list.remove = function(item) {
 			// remove an item from the list
@@ -339,7 +350,13 @@ LAD.AbstractInput = LAD.Dispatcher.extend({
 	},
 	anyPressed: function() {
 		// returns true if any of the buttons in the args are pressed
+		// if no args returns true if anything at all is pressed
 		var i = arguments.length;
+		if (arguments.length < 1) {
+			for (var key in this.pressed)
+				if (this.pressed[key] == true) return true;
+				return false;
+		}
 		var actionNameOrButton;
 		while (i-- > 0) {
 			actionNameOrButton = arguments[i];
@@ -398,26 +415,6 @@ LAD.MouseInput = LAD.AbstractInput.extend({
 				this.y = e.offsetY;
 				break;
 		}
-	}
-});
-
-/*
-	LAD.GamepadInput extends LAD.AbstractInput to handle the pressing
-	of gamepad buttons and axis'.
-*/
-LAD.GamepadInput = LAD.AbstractInput.extend({
-	init: function() {
-		this.uber("gamepad");
-		this.x = this.y = 0;
-		var gamepad = navigator.webkitGamepads[0] 
-			|| navigator.MozGamepads[0];
-		if (!gamepad) return;
-		this.gamepad = gamepad;
-		this.monitorInput();
-	},
-	monitorInput: function() {
-		//clearTimeout(this.inputTimer);
-		//this.inputTimer = setTimeout(this.monitorInput.bind(this), 10);*/
 	}
 });
 
@@ -817,9 +814,10 @@ LAD.Path = LAD.Class.extend({
 		this.add(x + width, y + height);
 		this.add(y, y + height);
 	},
-	render: function(c, t) {
+	render: function(r, t) {
 		// renders the path
 		if (this.points.length < 2) return;
+		var cos, sin, c = r.context;
 		
 		var filling = this.fillColor != null,
 			stroking = this.lineWidth > 0,		
@@ -885,11 +883,11 @@ LAD.Group = LAD.Class.extend({
 		}
 		return path || null;
 	},
-	render: function(c, t) {
+	render: function(r, t) {
 		// renders all paths
 		var i = -1, len = this.paths.length;
 		while (++i < len) {
-			this.paths[i].render(c, t);
+			this.paths[i].render(r, t);
 		}
 	},
 	getBounds: function() {
@@ -921,9 +919,10 @@ LAD.Sprite = LAD.Class.extend({
 		this.anchor = anchor || new LAD.Point();
 		this.alpha = 1;
 	},
-	render: function(c, t) {
+	render: function(r, t) {
 		// renders the sprite with the given transformation
 		if (!this.image) return;
+		var c = r.context;
 		c.globalAlpha = this.alpha;
 		c.drawImage(this.image, 
 			this.clipRect.x, 
@@ -971,11 +970,11 @@ LAD.SpriteGrid = LAD.Class.extend({
 		if (isNaN(row)) row = this.row;
 		return this.sprites[row * this.numCols + col];
 	},
-	render: function(c, t) {
+	render: function(r, t) {
 		// renders the current sprite with the given transformation
 		var sprite = this.getSprite(this.col || 0, this.row || 0);
 		sprite.alpha = this.alpha;
-		sprite.render(c, t);
+		sprite.render(r, t);
 	},
 });
 
@@ -1012,25 +1011,25 @@ LAD.Entity = LAD.Class.extend({
 		if (this.hasUpdate) this.update();
 		this.prevTransform.copy(this.transform);
 	},
-	callRender: function(c) {
+	callRender: function(r) {
 		// calls the render function, if it exists
-		this.calcRender();
-		if (this.hasRender) this.render(c);
+		this.calcRender(r);
+		if (this.hasRender) this.render(r);
 	},
-	calcRender: function() {
+	calcRender: function(r) {
 		// calculates the render transformation 
 		// (interpolates between previous and current transformation)
 		var t = this.renderTransform;
-		t.copy(this.prevTransform).ease(this.transform, this.game.renderPC);
+		t.copy(this.prevTransform).ease(this.transform, r.percent);
 		if (this.parent) t.add(this.parent.renderTransform);
 	},
 	onCollision: function(entity) {
 		// a blank collision handler for overriding
 	},
-	render: function(c) {
+	render: function(r) {
 		// renders a clip, if specified with the render transfromation
 		if (this.clip == null) return;
-		this.clip.render(c, this.renderTransform);
+		this.clip.render(r, this.renderTransform);
 	}
 });
 
@@ -1083,13 +1082,12 @@ LAD.Scene = LAD.Entity.extend({
 			updating[i].callUpdate();
 		}
 	},
-	callRender: function(c) {
+	callRender: function(r) {
 		// calls render on scene, then entities within
-		this.uber(c);
+		this.uber(r);
 		for (var i = 0; i < this.entities.length; i++) {
-			this.entities[i].callRender(c);
-		}		
-		LAD.log("render");
+			this.entities[i].callRender(r);
+		}
 	},
 	replace: function(oldEntity, entity) {
 		// replaces an entity in the scene with one not in the scene
