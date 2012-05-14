@@ -1,6 +1,6 @@
 /*
-	LAD.js: Little Aischtiemelle Dynamo
-	--------------------------------
+	LAD.js: Little HTML Dynamo
+	--------------------------
 	Copyright (c) 2012, Dale J Williams
 	All rights reserved.
 
@@ -35,16 +35,18 @@
 */
 var LAD = {
 	debug: false,
-	isFunction: function(prop) {
-		return (typeof prop) == "function";
+	isFunction: function(object) {
+		// returns true if the object is a function
+		return (typeof object) == "function";
 	},
 	log: function() {
+		// an internal logging function
 		if (console) console.log(arguments);
 	},
 	error: function() {
+		// an internal error logging function
 		if (console) console.error(arguments);
-	},
-	Class: function(){}
+	}
 };
 
 /*
@@ -54,6 +56,7 @@ var LAD = {
 	This method was based on the inheritance pattern found at:
 	http://ejohn.org/blog/simple-javascript-inheritance/
 */
+LAD.Class =  function(){};
 LAD.Class.extend = function(props) {
 	var uber = this.prototype;
 	LAD.constructing = true;
