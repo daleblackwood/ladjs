@@ -1,39 +1,51 @@
 /*
 	LAD.js DEMO: SHAPESHIPS
 	-----------------------
+	Version 0.9
 	Copyright (c) 2012, Dale J Williams
 	All rights reserved.
 
 	Redistribution and use in source and binary forms, with or without
-	modification, are permitted provided that the following conditions are met:
-		* Redistributions of source code must retain the above copyright
-		  notice, this list of conditions and the following disclaimer.
-		* Redistributions in binary form must reproduce the above copyright
-		  notice, this list of conditions and the following disclaimer in the
-		  documentation and/or other materials provided with the distribution.
-		* Neither the name of the author nor the names of any contributors may 
-		  be used to endorse or promote products derived from this software 
-		  without specific prior written permission.
+	modification, are permitted provided that the following conditions
+	are met:
+	* Redistributions of source code must retain the above copyright
+	  notice, this list of conditions and the following disclaimer.
+	* Redistributions in binary form must reproduce the above copyright
+	  notice, this list of conditions and the following disclaimer in
+	  the documentation and/or other materials provided with the 
+	  distribution.
+	* Neither the name of the author nor the names of any contributors
+	  may be used to endorse or promote products derived from this 
+	  software  without specific prior written permission.
 
-	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-	DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
-	DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-	(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-	LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-	ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-	(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+	"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+	LIMITED TO, THE IMPLIED	WARRANTIES OF MERCHANTABILITY AND FITNESS 
+	FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+	DALE J WILLIAMS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
+	SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT 
+	LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF 
+	USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+	ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
+	OR TORT	(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT 
+	OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+	SUCH DAMAGE.
 */
 
 "use strict"; 
-
+/*
+	SS is an object that acts as a namespace for all classes in the 
+	Shapeships demo.
+*/
 var SS = {};
 
+/*
+	SS.Game extends LAD.Game to include key bindings, mouse binding,
+	input and some game specific properties.
+*/
 SS.Game = LAD.Game.extend({
 	init: function(canvasName) {
-		this.uber(canvasName, 30);
+		this.uber(canvasName, 120);
 		this.hud = new SS.HUD(this);	
 		this.keys = {
 			up: 87, // W
@@ -57,6 +69,10 @@ SS.Game = LAD.Game.extend({
 	}
 });
 
+/*
+	SS.Input extends LAD.MultiInput to include anglular detect on
+	multiple devices.
+*/
 SS.Input = LAD.MultiInput.extend({	
 	init: function(player) {
 		this.uber();
@@ -66,7 +82,7 @@ SS.Input = LAD.MultiInput.extend({
 		return this.getAngle("left", "up", "right", "down");
 	},
 	getShootAngle: function() {
-		if (this.isPressed("shoot")) {
+		if (!this.isPressed("shoot")) {
 			return this.getAngle("shootLeft", "shootUp", "shootRight", "shootDown");
 		} else {
 			var t = this.player.renderTransform;
@@ -92,6 +108,10 @@ SS.Input = LAD.MultiInput.extend({
 	},
 });
 
+/*
+	SS.Score keeps track of the player's current score, lives and 
+	multiplier.
+*/
 SS.Score = LAD.Class.extend({
 	init: function() {
 		this.reset();
@@ -106,6 +126,10 @@ SS.Score = LAD.Class.extend({
 	}
 });
 
+/*
+	SS.Wave determines the number of enemies, their spawn speed and
+	which types are displayed for each wave in the game.
+*/
 SS.Wave = LAD.Class.extend({
 	init: function() {
 		this.reset();
@@ -172,6 +196,9 @@ SS.Wave = LAD.Class.extend({
 	}
 });
 
+/*
+	SS.Grid displays a grid for the map (behind the player).
+*/
 SS.Grid = LAD.Entity.extend({
 	init: function() {
 		this.uber();
@@ -217,16 +244,22 @@ SS.Grid = LAD.Entity.extend({
 	}
 });
 
+/*
+	SS.Ship acts as a base class for all ships and bullets in the game.
+*/
 SS.Ship = LAD.Entity.extend({
 	init: function() {
 		this.uber();
 		this.speed = 10;
 		this.enemy = false;
 		this.ship = true;
-		this.move = new LAD.Point(0, -1);
-		this.moveDelta = new LAD.Point(0, -1);
+		this.move = new LAD.Vector(0, -1);
+		this.moveDelta = new LAD.Vector(0, -1);
 		this.origin = new LAD.Point();
 		this.hitRadius = 20;
+	},
+	update: function() {
+		this.transform.add(this.move);
 	},
 	onCollision: function(e) {}
 });
@@ -234,7 +267,6 @@ SS.Ship = LAD.Entity.extend({
 SS.Bullet = SS.Ship.extend({
 	init: function() { 
 		this.uber(); 
-		this.move = new LAD.Point();
 		this.hitRadius = 20;
 		this.enemy = false;
 		
@@ -248,24 +280,24 @@ SS.Bullet = SS.Ship.extend({
 		this.clip = p;
 	},
 	go: function(angle, speed) {
-		this.move.x = Math.cos(angle) * speed;
-		this.move.y = Math.sin(angle) * speed;
+		this.move.setVector(angle, speed);
 		this.transform.rotation = angle + Math.PI * 0.5;
 	},
 	update: function() {
-		this.transform.x += this.move.x;
-		this.transform.y += this.move.y;
+		this.uber();
 		if (this.scene.isWithin(this)) return;
 		this.scene.remove(this);
 	},
 	onCollision: function(e) {
-		if (e == this.scene.ship) return;
-		if (e.enemy == true) {
-			this.scene.kill(e);
-		}
+		if (e == this.scene.ship || e.enemy != true) return;
+		this.scene.kill(e);
 	}
 });
 
+/*
+	SS.PlayerShip extends SS.Ship to include player control and input
+	responses.
+*/
 SS.PlayerShip = SS.Ship.extend({
 	init: function() {
 		this.uber();
@@ -281,7 +313,7 @@ SS.PlayerShip = SS.Ship.extend({
 	awake: function() {
 		this.input = this.game.input;
 		this.input.keyboard.addActions(this.game.keys);
-		this.input.keyboard.addActions(this.game.mouse);
+		this.input.mouse.addActions(this.game.mouse);
 		this.input.player = this;
 		this.draw();
 	},
@@ -325,28 +357,20 @@ SS.PlayerShip = SS.Ship.extend({
 	},
 	reset: function() {
 		this.transform.rotation = 0;
-		this.move.x = 0;
-		this.move.y = -1;
-		this.moveDelta.x = 0;
-		this.moveDelta.y = -1;
+		this.move.setPosition(0, -1);
+		this.moveDelta.copy(this.move);
 		this.frame = 0;
 	},
 	update: function() {
 		var moveAngle = this.game.input.getMoveAngle();
 		
-		if (isNaN(moveAngle)) {
-			this.moveDelta.setPosition(0, 0);
-		} else {
-			this.moveDelta.x = Math.cos(moveAngle) * this.speed;
-			this.moveDelta.y = Math.sin(moveAngle) * this.speed;
-		}
-		this.move.x = (this.move.x * 4 + this.moveDelta.x) * 0.2;
-		this.move.y = (this.move.y * 4 + this.moveDelta.y) * 0.2;
+		if (isNaN(moveAngle)) this.moveDelta.reset();
+		else this.moveDelta.setVector(moveAngle, this.speed);
+		this.move.ease(this.moveDelta, 0.2);
 		
 		var rot = this.origin.directionTo(this.move);
 		this.transform.rotation = rot + Math.PI * 0.5;
-		this.transform.x += this.move.x;
-		this.transform.y += this.move.y;
+		this.transform.add(this.move);
 		
 		this.scene.constrain(this);
 		
@@ -382,6 +406,9 @@ SS.PlayerShip = SS.Ship.extend({
 	}
 });
 
+/*
+	SS.ChaserShip is an enemy ship that follows the player's ship.
+*/
 SS.ChaserShip = SS.Ship.extend({
 	init: function() {
 		this.uber();
@@ -441,8 +468,7 @@ SS.ChaserShip = SS.Ship.extend({
 		
 		var rot = this.origin.directionTo(this.move);
 		this.transform.rotation = rot + Math.PI * 0.5;
-		this.transform.x += this.move.x;
-		this.transform.y += this.move.y;
+		this.transform.add(this.move);
 		
 		this.scene.constrain(this);
 	},
@@ -460,13 +486,15 @@ SS.ChaserShip = SS.Ship.extend({
 	}
 });
 
+/*
+	SS.BounceShip is an enemy ship that travels diagonally from wall
+	to wall, turning 90 degrees at each wall collision.
+*/
 SS.BounceShip = SS.Ship.extend({
 	init: function() {
 		this.uber();
 		this.speed = 10;
 		this.hitRadius = 15;
-		this.move = new LAD.Point(0, -1);
-		this.moveDelta = new LAD.Point(0, -1);
 		this.origin = new LAD.Point();
 		this.enemy = true;
 		this.draw();
@@ -508,15 +536,11 @@ SS.BounceShip = SS.Ship.extend({
 		this.setRandomDirection();
 	},
 	update: function() {
-		this.moveDelta.x = Math.cos(this.direction) * this.speed;
-		this.moveDelta.y = Math.sin(this.direction) * this.speed;
-
-		this.move.x = (this.move.x * 4 + this.moveDelta.x) * 0.2;
-		this.move.y = (this.move.y * 4 + this.moveDelta.y) * 0.2;
+		this.moveDelta.setVector(this.direction, this.speed);
+		this.move.ease(this.moveDelta, 0.2);
 		
 		this.transform.rotation += 0.2;
-		this.transform.x += this.move.x;
-		this.transform.y += this.move.y;
+		this.transform.add(this.move);
 		
 		if (this.scene.isWithin(this)) return;
 		this.scene.constrain(this);
@@ -537,6 +561,9 @@ SS.BounceShip = SS.Ship.extend({
 	}
 });
 
+/*
+	SS.Explosion causes a particle explosion at a specified point.
+*/
 SS.Explosion = LAD.Entity.extend({
 	init: function(parts, speed){
 		this.uber();
@@ -563,10 +590,13 @@ SS.Explosion = LAD.Entity.extend({
 	}
 });
 
+/*
+	SS.ExplosionPart is a single particle from a particle explosion.
+*/
 SS.ExplosionPart = LAD.Entity.extend({
 	init: function() { 
 		this.uber();
-		
+		this.move = new LAD.Vector();
 		this.magnetDistance = 150;
 		
 		var p = new LAD.Path();
@@ -579,10 +609,8 @@ SS.ExplosionPart = LAD.Entity.extend({
 		if (isNaN(this.life)) this.life = Math.random()*60+60;
 		this.lived = 0;
 		this.clip.fillColor = color;
-		
-		var px = Math.cos(angle);
-		var py = Math.sin(angle);
-		this.move = new LAD.Point(px, py);
+
+		this.move.setVector(angle, speed);
 		
 		this.transform.rotation = angle;
 		this.hitRadius = 5;
@@ -591,13 +619,12 @@ SS.ExplosionPart = LAD.Entity.extend({
 		if (this.magnetic && this.scene.state == "alive") {
 			this.speed += 0.5;
 			var ang = this.transform.directionTo(this.scene.ship.transform);
-			this.move.setPosition(Math.cos(ang)*this.speed, Math.sin(ang)*this.speed);
+			this.move.setVector(ang, this.speed);
 		} else {
 			if (this.scene.ship) this.magnetic = this.lived > 10 && this.transform.isWithinDistance(this.scene.ship.transform, this.magnetDistance);
-			this.speed *= 0.95;
+			this.move.multiply(0.95);
 		}
-		this.transform.x += this.move.x * this.speed;
-		this.transform.y += this.move.y * this.speed;
+		this.transform.add(this.move);
 		this.scene.constrain(this);
 		if (this.lived++ < this.life) return;
 		this.scene.remove(this);
@@ -610,6 +637,9 @@ SS.ExplosionPart = LAD.Entity.extend({
 	}
 });
 
+/*
+	SS.SmokePart is the trail behind the  player's ship.
+*/
 SS.SmokePart = LAD.Entity.extend({
 	init: function() {
 		this.uber();
@@ -643,6 +673,10 @@ SS.SmokePart = LAD.Entity.extend({
 	}
 });
 
+/*
+	SS.Scene extends LAD.Scene to include game-specific collision
+	detection, spawning and other map-level operations.
+*/
 SS.Scene = LAD.Scene.extend({
 	init: function() {
 		this.uber();
@@ -793,6 +827,9 @@ SS.Scene = LAD.Scene.extend({
 	}
 });
 
+/*
+	SS.HUD displays the score, multi, etc.
+*/
 SS.HUD = LAD.Class.extend({
 	init: function(game) {
 		this.game = this;
@@ -820,6 +857,10 @@ SS.HUD = LAD.Class.extend({
 	}
 });
 
+/*
+	SS.MenuScreen acts as a base class for the various menu screens
+	displayed before and after the game.
+*/
 SS.MenuScreen = LAD.Scene.extend({
 	init: function(nextScreen) {
 		this.uber();
@@ -832,7 +873,6 @@ SS.MenuScreen = LAD.Scene.extend({
 		}
 	},
 	handleInput: function() {
-		console.log("handleInput");
 		this.game.input.removeListener(this.handleInputBind);
 		this.game.setScene(this.nextScreen);
 	},
@@ -851,6 +891,10 @@ SS.MenuScreen = LAD.Scene.extend({
 	constrain: function(e) {}
 })
 
+/*
+	SS.TitleScreen is displayed before the game starts, showing many
+	explosions and title text.
+*/
 SS.TitleScreen = SS.MenuScreen.extend({
 	init: function() {
 		this.uber(new SS.Scene());
@@ -885,8 +929,6 @@ SS.TitleScreen = SS.MenuScreen.extend({
 		c.strokeText("A CANVAS POWERED SHOOTER", w * 0.5, h * 0.5 - 45);
 		
 		c.font = "32px serif";
-		//c.strokeText("PLAY GAME", w * 0.5, h * 0.5 + 90);
-		//c.strokeText("HIGH SCORES", w * 0.5, h * 0.5 + 140);
 		c.strokeText("CLICK TO START", w * 0.5, h * 0.5 + 160);
 		
 		c.font = "14px serif";
@@ -894,6 +936,10 @@ SS.TitleScreen = SS.MenuScreen.extend({
 	}
 });
 
+/*
+	SS.EndScreen is displayed after the match is complete, giving a
+	summary of score and performance.
+*/
 SS.EndScreen = SS.MenuScreen.extend({
 	init: function() {
 		this.uber(new SS.TitleScreen());
